@@ -3,7 +3,7 @@
  * 
  */
 metadata {
-	definition (name: "Vesternet VES-ZW-WAL-008 2 Zone Wall Controller", namespace: "Vesternet", author: "Vesternet") {		
+	definition (name: "Vesternet VES-ZW-WAL-008 2 Zone Wall Controller", namespace: "Vesternet", author: "Vesternet", importUrl: "https://raw.githubusercontent.com/vesternet/hubitat-z-wave-device-drivers/main/Vesternet%20VES-ZW-WAL-008%202%20Zone%20Wall%20Controller.groovy") {		
         capability "PushableButton"
         capability "HoldableButton"
         capability "ReleasableButton"

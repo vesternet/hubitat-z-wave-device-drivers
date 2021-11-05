@@ -2,8 +2,8 @@
  *	Vesternet VES-ZW-REM-010 4 Channel Remote Control
  * 
  */
-metadata {
-	definition (name: "Vesternet VES-ZW-REM-010 4 Channel Remote Control", namespace: "Vesternet", author: "Vesternet") {		
+metadata {	
+	definition (name: "Vesternet VES-ZW-REM-010 4 Channel Remote Control", namespace: "Vesternet", author: "Vesternet", importUrl: "https://raw.githubusercontent.com/vesternet/hubitat-z-wave-device-drivers/main/Vesternet%20VES-ZW-REM-010%204%20Channel%20Remote%20Control.groovy") {		
         capability "PushableButton"
         capability "HoldableButton"
         capability "ReleasableButton"
