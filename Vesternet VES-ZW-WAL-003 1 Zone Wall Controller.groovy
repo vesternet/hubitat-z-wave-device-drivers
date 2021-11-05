@@ -2,8 +2,8 @@
  *	Vesternet VES-ZW-WAL-003 1 Zone Wall Controller
  * 
  */
-metadata {
-	definition (name: "Vesternet VES-ZW-WAL-003 1 Zone Wall Controller", namespace: "Vesternet", author: "Vesternet") {		
+metadata {	
+	definition (name: "Vesternet VES-ZW-WAL-003 1 Zone Wall Controller", namespace: "Vesternet", author: "Vesternet", importUrl: "https://raw.githubusercontent.com/vesternet/hubitat-z-wave-device-drivers/main/Vesternet%20VES-ZW-WAL-003%201%20Zone%20Wall%20Controller.groovy") {		
         capability "PushableButton"
         capability "HoldableButton"
         capability "ReleasableButton"
@@ -15,6 +15,7 @@ metadata {
 	}
 	preferences {
 		input name: "logEnable", type: "bool", title: "Enable Debug Logging", defaultValue: true
+		input name: "txtEnable", type: "bool", title: "Enable descriptionText Logging", defaultValue: true
 		input name: "doConfigure", type: "bool", title: "Carry out device configuration when it next wakes up", defaultValue: true
 	}
 }
@@ -23,10 +24,21 @@ def getCommandClassVersions() {
 	[ 0x5B: 3, 0x70: 1, 0x80: 1, 0x84: 2 ]
 }
 
-def installed() {	
-	device.updateSetting("logEnable", [value: "true", type: "bool"])
-	logDebug("installed called")
-	device.updateSetting("doConfigure", [value: "true", type: "bool"])
+def getModelNumberOfButtons() {
+    logDebug("getModelNumberOfButtons called")
+    ["41735" : 2]
+}
+
+def installed() {
+    device.updateSetting("logEnable", [value: "true", type: "bool"])
+    device.updateSetting("txtEnable", [value: "true", type: "bool"])
+    logDebug("installed called")	
+    def numberOfButtons = modelNumberOfButtons[device.getDataValue("deviceId")]
+    logDebug("numberOfButtons: ${numberOfButtons}")
+    sendEvent(getEvent(name: "numberOfButtons", value: numberOfButtons, displayed: false))
+    for(def buttonNumber : 1..numberOfButtons) {
+        sendEvent(getButtonEvent("pushed", buttonNumber, "digital"))
+    }
 	runIn(1800,logsOff)
 }
 
@@ -155,6 +167,7 @@ def zwaveEvent(hubitat.zwave.commands.batteryv1.BatteryReport cmd) {
 		batteryLevel = 1
 		descriptionText = "${device.displayName} battery level is low!"
 	} 	
+	logText(descriptionText)	                          
 	sendEvent(getEvent(name: "battery", value: batteryLevel, unit: "%", descriptionText: descriptionText))
 }
 
@@ -180,18 +193,14 @@ def release(button){
 
 def getButtonEvent(action, button, type) {
     logDebug("getButtonEvent called button: ${button} action: ${action} type: ${type} ")    
-	return getEvent(name: action, value: button, descriptionText: "${device.displayName} button ${button} is ${action}", isStateChange: true, type: type)
+	def descriptionText = "${device.displayName} button ${button} is ${action}"
+	logText(descriptionText)
+	return getEvent(name: action, value: button, descriptionText: descriptionText, isStateChange: true, type: type)
 }
 
 def getEvent(event) {
     logDebug("getEvent called data: ${event}")
     return createEvent(event)
-}
-
-def logDebug(msg) {
-	if (logEnable != false) {
-		log.debug("${msg}")
-	}
 }
 
 def commands(java.util.ArrayList cmds, delay = 200) {	
@@ -222,6 +231,19 @@ def secure(hubitat.zwave.Command cmd){
 
 def secure(java.util.ArrayList cmds){
     return cmds.collect { secure(it) }
+}
+
+
+def logDebug(msg) {
+	if (logEnable != false) {
+		log.debug("${msg}")
+	}
+}
+
+def logText(msg) {
+	if (txtEnable != false) {
+		log.info("${msg}")
+	}
 }
 
 def logsOff() {
