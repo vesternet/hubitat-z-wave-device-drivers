@@ -20,6 +20,7 @@ metadata {
 	preferences {
 		input name: "powerFailState", type: "enum", title: "Load State After Power Failure", options: [0: "off", 1: "on", 2: "previous state"], defaultValue: 2
 		input name: "switchType", type: "enum", title: "Switch Type Attached", options: [0: "momentary", 1: "toggle"], defaultValue: 0		
+		input name: "txtEnable", type: "bool", title: "Enable descriptionText Logging", defaultValue: true
 		input name: "logEnable", type: "bool", title: "Enable Debug Logging", defaultValue: true
 	}
 }
@@ -108,37 +109,47 @@ def zwaveEvent(hubitat.zwave.commands.basicv1.BasicReport cmd) {
 		type = "digital"
 		state["action"] = "unknown"
 	}
+	logText(descriptionText)
 	sendEvent(getEvent([name: "switch", value: switchValue, type: type, descriptionText: descriptionText]))
 	def levelValue = cmd.value == 99 ? 100 : cmd.value
 	descriptionText = "${device.displayName} was set to ${levelValue}%"
 	if (device.currentValue("level") && levelValue == device.currentValue("level")) {
 		descriptionText = "${device.displayName} is ${levelValue}%"
 	}
+	logText(descriptionText)
 	sendEvent(getEvent(name: "level", value: levelValue, type: type, unit: "%", descriptionText: descriptionText))
 }
 
 def zwaveEvent(hubitat.zwave.commands.meterv3.MeterReport cmd) {
 	logDebug("zwaveEvent hubitat.zwave.commands.meterv3.MeterReport called")
 	logDebug("got: ${cmd}")
+	def descriptionText = ""
 	if (cmd.meterType == 1) {
 		if (cmd.scale == 0) {
 			logDebug("energy report is ${cmd.scaledMeterValue} kWh")
-			sendEvent(getEvent(name: "energy", value: cmd.scaledMeterValue, unit: "kWh", descriptionText: "${device.displayName} is set to ${cmd.scaledMeterValue}kWh"))
+			descriptionText = "${device.displayName} is set to ${cmd.scaledMeterValue}kWh"
+			sendEvent(getEvent(name: "energy", value: cmd.scaledMeterValue, unit: "kWh", descriptionText: descriptionText))
 		} 
 		else if (cmd.scale == 2) {
 			logDebug("power report is ${cmd.scaledMeterValue} W")
-			sendEvent(getEvent(name: "power", value: cmd.scaledMeterValue, unit: "W", descriptionText: "${device.displayName} is set to ${cmd.scaledMeterValue}W"))
+			descriptionText = "${device.displayName} is set to ${cmd.scaledMeterValue}W"
+			sendEvent(getEvent(name: "power", value: cmd.scaledMeterValue, unit: "W", descriptionText: descriptionText))
 		}
 		else if (cmd.scale == 4) {
 			logDebug("voltage report is ${cmd.scaledMeterValue} V")
-			sendEvent(getEvent(name: "voltage", value: cmd.scaledMeterValue, unit: "V", descriptionText: "${device.displayName} is set to ${cmd.scaledMeterValue}V"))
+			descriptionText = "${device.displayName} is set to ${cmd.scaledMeterValue}V"
+			sendEvent(getEvent(name: "voltage", value: cmd.scaledMeterValue, unit: "V", descriptionText: descriptionText))
 		}
 		else if (cmd.scale == 5) {
 			logDebug("current report is ${cmd.scaledMeterValue} A")
-			sendEvent(getEvent(name: "current", value: cmd.scaledMeterValue, unit: "A", descriptionText: "${device.displayName} is set to ${cmd.scaledMeterValue}A"))
+			descriptionText = "${device.displayName} is set to ${cmd.scaledMeterValue}A"
+			sendEvent(getEvent(name: "current", value: cmd.scaledMeterValue, unit: "A", descriptionText: descriptionText))
 		}
 		else {
 			log.warn("skipped cmd: ${cmd}")
+		}
+		if (descriptionText != "") {
+			logText(descriptionText)
 		}
 	}
 }
@@ -230,12 +241,6 @@ def getEvent(event) {
     return createEvent(event)
 }
 
-def logDebug(msg) {
-	if (logEnable != false) {
-		log.debug("${msg}")
-	}
-}
-
 def commands(java.util.ArrayList cmds, delay = 200) {	
 	return delayBetween(cmds.collect { secure(it) }, delay)
 }
@@ -264,6 +269,18 @@ def secure(hubitat.zwave.Command cmd){
 
 def secure(java.util.ArrayList cmds){
     return cmds.collect { secure(it) }
+}
+
+def logDebug(msg) {
+	if (logEnable != false) {
+		log.debug("${msg}")
+	}
+}
+
+def logText(msg) {
+	if (txtEnable != false) {
+		log.info("${msg}")
+	}
 }
 
 def logsOff() {

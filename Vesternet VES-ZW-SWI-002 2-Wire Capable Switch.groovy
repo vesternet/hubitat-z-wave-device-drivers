@@ -14,6 +14,7 @@ metadata {
 	preferences {
 		input name: "powerFailState", type: "enum", title: "Load State After Power Failure", options: [0: "off", 1: "on", 2: "previous state"], defaultValue: 2
 		input name: "switchType", type: "enum", title: "Switch Type Attached", options: [0: "momentary", 1: "toggle"], defaultValue: 0
+		input name: "txtEnable", type: "bool", title: "Enable descriptionText Logging", defaultValue: true
 		input name: "logEnable", type: "bool", title: "Enable Debug Logging", defaultValue: true
 	}
 }
@@ -102,6 +103,7 @@ def zwaveEvent(hubitat.zwave.commands.basicv1.BasicReport cmd) {
 		type = "digital"
 		state["action"] = "unknown"
 	}
+	logText(descriptionText)
 	sendEvent(getEvent([name: "switch", value: switchValue, type: type, descriptionText: descriptionText]))
 }
 
@@ -150,12 +152,6 @@ def getEvent(event) {
     return createEvent(event)
 }
 
-def logDebug(msg) {
-	if (logEnable != false) {
-		log.debug("${msg}")
-	}
-}
-
 def commands(java.util.ArrayList cmds, delay = 200) {	
 	return delayBetween(cmds.collect { secure(it) }, delay)
 }
@@ -184,6 +180,18 @@ def secure(hubitat.zwave.Command cmd){
 
 def secure(java.util.ArrayList cmds){
     return cmds.collect { secure(it) }
+}
+
+def logDebug(msg) {
+	if (logEnable != false) {
+		log.debug("${msg}")
+	}
+}
+
+def logText(msg) {
+	if (txtEnable != false) {
+		log.info("${msg}")
+	}
 }
 
 def logsOff() {

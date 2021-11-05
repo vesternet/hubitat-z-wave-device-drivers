@@ -233,7 +233,6 @@ def secure(java.util.ArrayList cmds){
     return cmds.collect { secure(it) }
 }
 
-
 def logDebug(msg) {
 	if (logEnable != false) {
 		log.debug("${msg}")
