@@ -143,7 +143,7 @@ def zwaveEvent(hubitat.zwave.commands.meterv3.MeterReport cmd) {
 		else if (cmd.scale == 5) {
 			logDebug("current report is ${cmd.scaledMeterValue} A")
 			descriptionText = "${device.displayName} is set to ${cmd.scaledMeterValue}A"
-			sendEvent(getEvent(name: "current", value: cmd.scaledMeterValue, unit: "A", descriptionText: descriptionText))
+			sendEvent(getEvent(name: "amperage", value: cmd.scaledMeterValue, unit: "A", descriptionText: descriptionText))
 		}
 		else {
 			log.warn("skipped cmd: ${cmd}")
