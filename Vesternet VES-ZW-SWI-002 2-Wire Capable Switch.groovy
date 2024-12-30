@@ -9,10 +9,14 @@ metadata {
 		capability "Refresh"	
 		capability "Configuration"
 
+		attribute "deviceNotification", "string"
+
 		fingerprint mfr: "0330", prod: "0200", deviceId: "D00F", inClusters:"0x5E,0x55,0x98,0x9F,0x6C", deviceJoinName: "Vesternet VES-ZW-SWI-002 2-Wire Capable Switch"
 	}
 	preferences {
 		input name: "powerFailState", type: "enum", title: "Load State After Power Failure", options: [0: "off", 1: "on", 2: "previous state"], defaultValue: 2
+		input name: "basicReport", type: "enum", title: "Send Basic Report", options: [0: "disabled", 1: "enabled"], defaultValue: 1
+		input name: "switchInclusion", type: "enum", title: "Allow Switch Input To Include / Exclude", options: [0: "disabled", 1: "enabled"], defaultValue: 1
 		input name: "switchType", type: "enum", title: "Switch Type Attached", options: [0: "momentary", 1: "toggle"], defaultValue: 0
 		input name: "txtEnable", type: "bool", title: "Enable descriptionText Logging", defaultValue: true
 		input name: "logEnable", type: "bool", title: "Enable Debug Logging", defaultValue: true
@@ -27,6 +31,8 @@ def installed() {
 	device.updateSetting("logEnable", [value: "true", type: "bool"])
 	logDebug("installed called")
 	device.updateSetting("powerFailState", [value: "2", type: "enum"])
+	device.updateSetting("basicReport", [value: "1", type: "enum"])
+	device.updateSetting("switchInclusion", [value: "1", type: "enum"])
     device.updateSetting("switchType", [value: "0", type: "enum"])
 	runIn(1800,logsOff)
 }
@@ -35,6 +41,8 @@ def updated() {
 	logDebug("updated called")
 	log.warn("debug logging is: ${logEnable == true}")
 	log.warn("power fail state is: ${powerFailState == "0" ? "off" : powerFailState == "1" ? "on" : "previousstate"}")
+	log.warn("basic report is: ${basicReport == "0" ? "disabled" : "enabled"}")
+	log.warn("switch inclusion is: ${switchInclusion == "0" ? "disabled" : "enabled"}")
 	log.warn("switch type is: ${switchType == "0" ? "momentary" : "toggle"}")
 	state.clear()
 	unschedule()
@@ -43,7 +51,21 @@ def updated() {
 
 def configure() {
 	logDebug("configure called")
-	def cmds = commands([zwave.configurationV1.configurationGet(parameterNumber: 2), zwave.configurationV1.configurationSet(parameterNumber: 2, size: 1, scaledConfigurationValue: powerFailState.toInteger()), zwave.configurationV1.configurationGet(parameterNumber: 2), zwave.configurationV1.configurationGet(parameterNumber: 5), zwave.configurationV1.configurationSet(parameterNumber: 5, size: 1, scaledConfigurationValue: switchType.toInteger()), zwave.configurationV1.configurationGet(parameterNumber: 5)], 1000)
+	def cmds = commands([
+						zwave.configurationV1.configurationGet(parameterNumber: 2), 
+						zwave.configurationV1.configurationSet(parameterNumber: 2, size: 1, scaledConfigurationValue: powerFailState.toInteger()), 
+						zwave.configurationV1.configurationGet(parameterNumber: 2), 
+						zwave.configurationV1.configurationGet(parameterNumber: 3), 
+						zwave.configurationV1.configurationSet(parameterNumber: 3, size: 1, scaledConfigurationValue: basicReport.toInteger()), 
+						zwave.configurationV1.configurationGet(parameterNumber: 3), 
+						zwave.configurationV1.configurationGet(parameterNumber: 4), 
+						zwave.configurationV1.configurationSet(parameterNumber: 4, size: 1, scaledConfigurationValue: switchInclusion.toInteger()), 
+						zwave.configurationV1.configurationGet(parameterNumber: 4), 
+						zwave.configurationV1.configurationGet(parameterNumber: 5), 
+						zwave.configurationV1.configurationSet(parameterNumber: 5, size: 1, scaledConfigurationValue: switchType.toInteger()), 
+						zwave.configurationV1.configurationGet(parameterNumber: 5)
+						],
+						1000)
 	logDebug("sending ${cmds}")
 	return cmds            
 }
@@ -110,12 +132,14 @@ def zwaveEvent(hubitat.zwave.commands.basicv1.BasicReport cmd) {
 def zwaveEvent(hubitat.zwave.commands.notificationv8.NotificationReport cmd) {
 	logDebug("zwaveEvent hubitat.zwave.commands.notificationv8.NotificationReport called")
 	logDebug("got cmd: ${cmd}")
+	def deviceNotification = ""
     if (cmd.notificationType == 9) {
         logDebug("got system notification event: ${cmd.event}")
         switch (cmd.event) {
             case 7:
                 // emergency shutoff 
-                log.warn("temperature exceeds device limit, emergency shutoff triggered!")
+                deviceNotification = "temperature exceeds device limit, emergency shutoff triggered!"
+                log.warn(deviceNotification)	
                 break
             default:
 				log.warn("skipped cmd: ${cmd}")
@@ -124,6 +148,10 @@ def zwaveEvent(hubitat.zwave.commands.notificationv8.NotificationReport cmd) {
     else {
         log.warn("skipped cmd: ${cmd}")
     }
+	if (deviceNotification != "") {
+		def descriptionText = "${device.displayName} raised notifiction - ${deviceNotification}"
+		sendEvent(getEvent(name: "deviceNotification", value: deviceNotification, descriptionText: descriptionText))
+	}
 }
 
 def zwaveEvent(hubitat.zwave.Command cmd) {
