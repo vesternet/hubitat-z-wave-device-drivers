@@ -19,10 +19,27 @@ metadata {
         capability "Refresh"
 
         command "tripleTap", [ [ name:"Triple Tap*", type: "NUMBER", description: "Button number to triple tap", required: true ] ]
+		command "startCalibration"
+
+		attribute "deviceNotification", "string"
 		
         fingerprint mfr: "0330", prod: "0004", deviceId: "D00D", inClusters: "0x5E,0x55,0x98,0x9F,0x6C", deviceJoinName: "Vesternet VES-ZW-MOT-018 Motor Controller"                      
 	}
 	preferences {
+		input name: "stateChangePercentageReport", type: "number", title: "State Change Percentage Report (1% - 10%, 0 = disabled)", range: "0..10", defaultValue: 5
+		input name: "workingMode", type: "enum", title: "Working Mode", options: [0: "light mode", 1: "shutter mode without positioning", 2: "shutter mode with positioning"], defaultValue: 2
+		input name: "savePositioningPercentage", type: "enum", title: "Save Positioning Percentage", options: [0: "disabled", 1: "enabled"], defaultValue: 1
+		input name: "overCurrentProtection", type: "enum", title: "Overcurrent Protection (over 4.1A resistive, over 2.1A motor or capacitive)", options: [0: "disabled", 1: "enabled"], defaultValue: 1
+		input name: "localSwitchControlOption", type: "number", title: "Configuration Of Switch Control (Mode 0 - 4, 0 = default, see manual for options)", range: "0..4", defaultValue: 0
+		input name: "switchInclusion", type: "enum", title: "Allow Switch Input To Include / Exclude", options: [0: "disabled", 1: "enabled"], defaultValue: 1
+		input name: "centralSceneNotification", type: "enum", title: "Central Scene Configuration", options: [0: "disabled", 1: "enabled for both inputs", 2: "enabled for input S1", 3: "enabled for input S2"], defaultValue: 1
+		input name: "powerReportChangeWatts", type: "number", title: "Power Change Watts (1W - 255W, 0 = disabled)", range: "0..255", defaultValue: 5
+		input name: "voltageReportChangeVolts", type: "number", title: "Voltage Change Volts (1V - 255V, 0 = disabled)", range: "0..255", defaultValue: 2         
+		input name: "currentReportChangeAmps", type: "number", title: "Current Change Amps (0.1A - 25.5A, 0 = disabled)", range: "0..255", defaultValue: 1
+		input name: "slatsRotationTime", type: "number", title: "Slats Rotation Time (0.5s - 25s, 0 = disabled)", range: "0..250", defaultValue: 0
+		input name: "energyReportTime", type: "enum", title: "Energy Time (s)", options: [0: "disabled",10:"10s",20:"20s",30:"30s",40:"40s",50:"50s",60:"60s",90:"90s",120:"120s",240:"240s",300:"300s",600:"600s",1200:"1200s",1800:"1800s",3600:"3600s",7200:"7200s"], defaultValue: 1800
+		
+
         input name: "logEnable", type: "bool", title: "Enable Debug Logging", defaultValue: true
         input name: "txtEnable", type: "bool", title: "Enable descriptionText Logging", defaultValue: true
 	}
@@ -41,6 +58,18 @@ def installed() {
     device.updateSetting("logEnable", [value: "true", type: "bool"])
     device.updateSetting("txtEnable", [value: "true", type: "bool"])
     logDebug("installed called")	
+	device.updateSetting("stateChangePercentageReport", [value: 5, type: "number"])
+	device.updateSetting("workingMode", [value: "2", type: "enum"])    
+	device.updateSetting("savePositioningPercentage", [value: "1", type: "enum"])
+	device.updateSetting("overCurrentProtection", [value: "1", type: "enum"])
+	device.updateSetting("localSwitchControlOption", [value: 0, type: "number"])
+	device.updateSetting("switchInclusion", [value: "1", type: "enum"])
+	device.updateSetting("centralSceneNotification", [value: "1", type: "enum"])
+	device.updateSetting("powerReportChangeWatts", [value: 5, type: "number"])
+	device.updateSetting("voltageReportChangeVolts", [value: 2, type: "number"])
+	device.updateSetting("currentReportChangeAmps", [value: 1, type: "number"])
+	device.updateSetting("slatsRotationTime", [value: 0, type: "number"])
+	device.updateSetting("energyReportTime", [value: "1800", type: "enum"])
     def numberOfButtons = modelNumberOfButtons[device.getDataValue("deviceId")]
     logDebug("numberOfButtons: ${numberOfButtons}")
     sendEvent(getEvent(name: "numberOfButtons", value: numberOfButtons, displayed: false))
@@ -54,6 +83,18 @@ def updated() {
 	logDebug("updated called")
 	log.warn("debug logging is: ${logEnable == true}")
 	log.warn("descriptionText logging is: ${txtEnable == true}")
+	log.warn("state change percentage report is: ${stateChangePercentageReport}%")
+	log.warn("working mode is: ${workingMode == "0" ? "light mode" : workingMode == "1" ? "shutter mode without positioning" : "shutter mode with positioning"}")	
+	log.warn("save positioning percentage is: ${savePositioningPercentage == "0" ? "disabled" : "enabled"}")
+	log.warn("overcurrent protection is: ${overCurrentProtection == "0" ? "disabled" : "enabled"}")
+	log.warn("local switch control option is: ${localSwitchControlOption}")
+	log.warn("switch inclusion is: ${switchInclusion == "0" ? "disabled" : "enabled"}")
+	log.warn("central scene notification is: ${centralSceneNotification}")
+	log.warn("power report change watts is: ${powerReportChangeWatts}W") 
+	log.warn("voltage report change volts is: ${voltageReportChangeVolts}V") 
+	log.warn("current report change amps is: ${currentReportChangeAmps == 0 ?: currentReportChangeAmps / 10}A") 
+	log.warn("slats rotation time is: ${slatsRotationTime == 0 ?: slatsRotationTime / 10}s") 
+	log.warn("energy report time is: ${energyReportTime}s") 
     state.clear()
 	unschedule()
 	if (logEnable) runIn(1800,logsOff)
@@ -61,11 +102,73 @@ def updated() {
 
 def configure() {
 	logDebug("configure called")     
+	def cmds = commands([
+						zwave.configurationV1.configurationGet(parameterNumber: 2), 
+						zwave.configurationV1.configurationSet(parameterNumber: 2, size: 1, scaledConfigurationValue: stateChangePercentageReport.toInteger()), 
+						zwave.configurationV1.configurationGet(parameterNumber: 2),
+						zwave.configurationV1.configurationGet(parameterNumber: 3), 
+						zwave.configurationV1.configurationSet(parameterNumber: 3, size: 1, scaledConfigurationValue: workingMode.toInteger()), 
+						zwave.configurationV1.configurationGet(parameterNumber: 3),
+						zwave.configurationV1.configurationGet(parameterNumber: 4), 
+						zwave.configurationV1.configurationSet(parameterNumber: 4, size: 1, scaledConfigurationValue: savePositioningPercentage.toInteger()), 
+						zwave.configurationV1.configurationGet(parameterNumber: 4), 
+						zwave.configurationV1.configurationGet(parameterNumber: 5), 
+						zwave.configurationV1.configurationSet(parameterNumber: 5, size: 1, scaledConfigurationValue: overCurrentProtection.toInteger()), 
+						zwave.configurationV1.configurationGet(parameterNumber: 5),
+						zwave.configurationV1.configurationGet(parameterNumber: 7), 
+						zwave.configurationV1.configurationSet(parameterNumber: 7, size: 1, scaledConfigurationValue: localSwitchControlOption.toInteger()), 
+						zwave.configurationV1.configurationGet(parameterNumber: 7), 
+						zwave.configurationV1.configurationGet(parameterNumber: 8), 
+						zwave.configurationV1.configurationSet(parameterNumber: 8, size: 1, scaledConfigurationValue: switchInclusion.toInteger()), 
+						zwave.configurationV1.configurationGet(parameterNumber: 8), 
+						zwave.configurationV1.configurationGet(parameterNumber: 9), 
+						zwave.configurationV1.configurationSet(parameterNumber: 9, size: 1, scaledConfigurationValue: centralSceneNotification.toInteger()), 
+						zwave.configurationV1.configurationGet(parameterNumber: 9),
+						zwave.configurationV1.configurationGet(parameterNumber: 10), 
+						zwave.configurationV1.configurationSet(parameterNumber: 10, size: 1, scaledConfigurationValue: powerReportChangeWatts.toInteger()), 
+						zwave.configurationV1.configurationGet(parameterNumber: 10), 
+						zwave.configurationV1.configurationGet(parameterNumber: 11), 
+						zwave.configurationV1.configurationSet(parameterNumber: 11, size: 1, scaledConfigurationValue: currentReportChangeAmps.toInteger()), 
+						zwave.configurationV1.configurationGet(parameterNumber: 11), 
+						zwave.configurationV1.configurationGet(parameterNumber: 12), 
+						zwave.configurationV1.configurationSet(parameterNumber: 12, size: 1, scaledConfigurationValue: voltageReportChangeVolts.toInteger()), 
+						zwave.configurationV1.configurationGet(parameterNumber: 12),
+						zwave.configurationV1.configurationGet(parameterNumber: 13), 
+						zwave.configurationV1.configurationSet(parameterNumber: 13, size: 1, scaledConfigurationValue: slatsRotationTime.toInteger()), 
+						zwave.configurationV1.configurationGet(parameterNumber: 13),
+						zwave.configurationV1.configurationGet(parameterNumber: 14), 
+						zwave.configurationV1.configurationSet(parameterNumber: 14, size: 4, scaledConfigurationValue: energyReportTime.toInteger()), 
+						zwave.configurationV1.configurationGet(parameterNumber: 14)
+						],
+						1000)
+	logDebug("sending ${cmds}")
+	return cmds 
+}
+
+def startCalibration() {
+    logDebug("startCalibration called")
+	def cmds = commands([
+						zwave.configurationV1.configurationGet(parameterNumber: 6), 
+						zwave.configurationV1.configurationSet(parameterNumber: 6, size: 1, scaledConfigurationValue: 1), 
+						zwave.configurationV1.configurationGet(parameterNumber: 6),
+						],
+						1000)
+	logDebug("sending ${cmds}")
+	return cmds
+	//TODO - check that returned commands are executed, if not doZig
 }
 
 def refresh() {
 	logDebug("refresh called")    
-	def cmds = commands([zwave.basicV1.basicGet(), zwave.switchMultilevelV3.switchMultilevelGet(), zwave.meterV3.meterGet(scale: 0), zwave.meterV3.meterGet(scale: 2), zwave.meterV3.meterGet(scale: 4), zwave.meterV3.meterGet(scale: 5)])
+	def cmds = commands([
+						zwave.basicV1.basicGet(), 
+						zwave.switchMultilevelV3.switchMultilevelGet(), 
+						zwave.meterV3.meterGet(scale: 0), 
+						zwave.meterV3.meterGet(scale: 2), 
+						zwave.meterV3.meterGet(scale: 4), 
+						zwave.meterV3.meterGet(scale: 5)
+						],
+						500)
 	logDebug("sending ${cmds}")
 	return cmds
 }
@@ -351,17 +454,20 @@ def zwaveEvent(hubitat.zwave.commands.notificationv8.NotificationReport cmd) {
 def zwaveEvent(hubitat.zwave.commands.notificationv8.NotificationReport cmd, endpoint) {
 	logDebug("zwaveEvent hubitat.zwave.commands.notificationv8.NotificationReport called")
 	logDebug("got cmd: ${cmd} from endpoint: ${endpoint}")
+	def deviceNotification = ""
 	if (endpoint == 0) {
 		if (cmd.notificationType == 8) {
 			logDebug("got power management notification event: ${cmd.event}")
 			switch (cmd.event) {
 				case 6:
 					// overcurrent detected
-					log.warn("current exceeds device limit, emergency shutoff triggered!")
+					deviceNotification = "current exceeds device limit, emergency shutoff triggered!"
+                	log.warn(deviceNotification)
 					break
 				case 8:
 					// overload detected
-					log.warn("load exceeds device limit, emergency shutoff triggered!")
+					deviceNotification = "load exceeds device limit, emergency shutoff triggered!"
+                	log.warn(deviceNotification)
 					break
 				default:
 					log.warn("skipped cmd: ${cmd}")
@@ -373,6 +479,10 @@ def zwaveEvent(hubitat.zwave.commands.notificationv8.NotificationReport cmd, end
 	}
 	else {
 		logDebug("got command from unexpected endpoint, skipping!")
+	}
+	if (deviceNotification != "") {
+		def descriptionText = "${device.displayName} raised notifiction - ${deviceNotification}"
+		sendEvent(getEvent(name: "deviceNotification", value: deviceNotification, descriptionText: descriptionText))
 	}
 }
 
