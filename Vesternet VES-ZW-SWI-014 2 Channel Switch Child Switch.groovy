@@ -1,13 +1,12 @@
 /**
  *    Vesternet VES-ZW-SWI-014 2 Channel Switch Child Switch
- * 
  */
 metadata {
-    definition (name: "Vesternet VES-ZW-SWI-014 2 Channel Switch Child Switch", namespace: "Vesternet", author: "Vesternet", component: true, importUrl: "https://raw.githubusercontent.com/vesternet/hubitat-z-wave-device-drivers/main/Vesternet%20VES-ZW-SWI-014%202%20Channel%20Switch%20Child%20Switch.groovy") {
-        capability "Switch"        
-        capability "Actuator"        
+    definition(name: "Vesternet VES-ZW-SWI-014 2 Channel Switch Child Switch", namespace: "Vesternet", author: "Vesternet", component: true, importUrl: "https://raw.githubusercontent.com/vesternet/hubitat-z-wave-device-drivers/main/Vesternet%20VES-ZW-SWI-014%202%20Channel%20Switch%20Child%20Switch.groovy") {
+        capability "Switch"
+        capability "Actuator"
         capability "Sensor"
-        capability "Refresh"        
+        capability "Refresh"
     }
     preferences {
         input name: "logEnable", type: "bool", title: "Enable Debug Logging", defaultValue: true
@@ -18,7 +17,7 @@ metadata {
 def installed() {
     device.updateSetting("logEnable", [value: "true", type: "bool"])
     device.updateSetting("txtEnable", [value: "true", type: "bool"])
-    logDebug("installed called")    
+    logDebug("installed called")
     runIn(1800,logsOff)
 }
 
@@ -32,12 +31,12 @@ def updated() {
 }
 
 def refresh() {
-    logDebug("refresh called")    
+    logDebug("refresh called")
     parent?.componentRefresh(this.device)
 }
 
 def on() {
-    logDebug("on called")    
+    logDebug("on called")
     parent?.componentOn(this.device)
 }
 
@@ -48,7 +47,7 @@ def off() {
 
 void parse(String description) {
     logDebug("parse called")
-    log.warn "parse(String description) not implemented"   
+    log.warn "parse(String description) not implemented"
 }
 
 void parse(List description) {
